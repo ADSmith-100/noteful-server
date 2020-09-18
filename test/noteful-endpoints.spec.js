@@ -1,9 +1,9 @@
 const knex = require("knex");
 const app = require("../src/app");
 const { makeNotesArray, makeMaliciousNote } = require("./notes.fixtures");
-const { makeFoldersArray } = require("./folders.fixtures");
+const { makeFoldersArray, makeMaliciousFolder } = require("./folders.fixtures");
 
-describe("notes Endpoints", function () {
+describe("Notes and Folders Endpoints", function () {
   let db;
 
   before("make knex instance", () => {
@@ -239,7 +239,7 @@ describe("notes Endpoints", function () {
       });
     });
   });
-  describe(`PATCH /api/notes/:article_id`, () => {
+  describe(`PATCH /api/notes/:note_id`, () => {
     context(`Given no notes`, () => {
       it(`responds with 404`, () => {
         const noteId = 123456;
@@ -317,5 +317,50 @@ describe("notes Endpoints", function () {
       });
     });
   });
+  describe(`GET /api/folders`, () => {
+    context(`Given no folders`, () => {
+      it(`responds with 200 and an empty list`, () => {
+        return supertest(app).get("/api/folders").expect(200, []);
+      });
+    });
+    context("Given there are folders in the database", () => {
+      const testFolders = makeFoldersArray();
+      //const testNotes = makeNotesArray();
+
+      beforeEach("insert folders", () => {
+        return db.into("noteful_folders").insert(testFolders);
+        //db
+        //.into("noteful_notes")
+        //.insert(testNotes)
+        // .then(() => {
+      });
+
+      it("responds with 200 and all of the folders", () => {
+        return supertest(app).get("/api/folders").expect(200, testFolders);
+      });
+    });
+  });
+  context(`Given an XSS attack folder`, () => {
+    const testNotes = makeNotesArray();
+    const { maliciousFolder, expectedFolder } = makeMaliciousFolder();
+
+    beforeEach("insert malicious folder", () => {
+      //return db
+      // .into("noteful_notes")
+      //.insert(testNotes)
+      //.then(() => {
+      return db.into("noteful_folders").insert([maliciousFolder]);
+    });
+
+    it("removes XSS attack content", () => {
+      return supertest(app)
+        .get(`/api/folders`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body[0].name).to.eql(expectedFolder.name);
+        });
+    });
+  });
 });
+
 //start adding folder tests here...

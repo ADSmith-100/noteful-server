@@ -5,7 +5,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const { NODE_ENV } = require("./config");
 const notesRouter = require("../Notes/notes-router");
-//const usersRouter = require("./users/users-router");
+const foldersRouter = require("../Folders/folders-router");
 //const commentsRouter = require("./comments/comments-router");
 
 const app = express();
@@ -17,7 +17,7 @@ app.use(helmet());
 app.use(cors());
 
 app.use("/api/notes", notesRouter);
-//app.use("api/folders", foldersRouter);
+app.use("/api/folders", foldersRouter);
 //app.use("/api/users", usersRouter);
 //app.use("/api/articles", articlesRouter);
 

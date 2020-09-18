@@ -35,13 +35,14 @@ foldersRouter
       .then((folder) => {
         res
           .status(201)
-          .location(path.posix.join(req.originalUrl, `/${Folder.id}`))
+          .location(path.posix.join(req.originalUrl, `/${folder.id}`))
           .json(serializeFolder(folder));
       })
       .catch(next);
   });
 
-FoldersRouter.route("/:folder_id")
+foldersRouter
+  .route("/:folder_id")
   .all((req, res, next) => {
     FoldersService.getById(req.app.get("db"), req.params.folder_id)
       .then((folder) => {
@@ -62,4 +63,4 @@ FoldersRouter.route("/:folder_id")
     });
   });
 
-module.exports = FoldersRouter;
+module.exports = foldersRouter;
