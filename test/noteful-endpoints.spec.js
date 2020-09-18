@@ -3,7 +3,7 @@ const app = require("../src/app");
 const { makeNotesArray, makeMaliciousNote } = require("./notes.fixtures");
 const { makeFoldersArray } = require("./folders.fixtures");
 
-describe("Articles Endpoints", function () {
+describe("notes Endpoints", function () {
   let db;
 
   before("make knex instance", () => {
@@ -156,6 +156,165 @@ describe("Articles Endpoints", function () {
         .then((res) =>
           supertest(app).get(`/api/notes/${res.body.id}`).expect(res.body)
         );
+    });
+  });
+  const requiredFields = ["name", "folderid", "content"];
+
+  requiredFields.forEach((field) => {
+    const newNote = {
+      name: "Test new note",
+      folderid: 2,
+      content: "Test new note content...",
+    };
+
+    it(`responds with 400 and an error message when the '${field}' is missing`, () => {
+      delete newNote[field];
+
+      return supertest(app)
+        .post("/api/notes")
+        .send(newNote)
+        .expect(400, {
+          error: { message: `Missing '${field}' in request body` },
+        });
+    });
+  });
+
+  context(`Given an XSS attack note`, () => {
+    const testFolders = makeFoldersArray();
+    const { maliciousNote, expectedNote } = makeMaliciousNote();
+
+    beforeEach("insert malicious note", () => {
+      return db
+        .into("noteful_folders")
+        .insert(testFolders)
+        .then(() => {
+          return db.into("noteful_notes").insert([maliciousNote]);
+        });
+    });
+
+    it("removes XSS attack content", () => {
+      return supertest(app)
+        .get(`/api/notes/${maliciousNote.id}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.name).to.eql(expectedNote.name);
+          expect(res.body.content).to.eql(expectedNote.content);
+        });
+    });
+  });
+  describe(`DELETE /api/notes/:note_id`, () => {
+    context(`Given no notes`, () => {
+      it(`responds with 404`, () => {
+        const noteId = 123456;
+        return supertest(app)
+          .delete(`/api/notes/${noteId}`)
+          .expect(404, { error: { message: `Note doesn't exist` } });
+      });
+    });
+
+    context("Given there are notes in the database", () => {
+      const testFolders = makeFoldersArray();
+      const testNotes = makeNotesArray();
+
+      beforeEach("insert note", () => {
+        return db
+          .into("noteful_folders")
+          .insert(testFolders)
+          .then(() => {
+            return db.into("noteful_notes").insert(testNotes);
+          });
+      });
+
+      it("responds with 204 and removes the note", () => {
+        const idToRemove = 2;
+        const expectedNotes = testNotes.filter(
+          (note) => note.id !== idToRemove
+        );
+        return supertest(app)
+          .delete(`/api/notes/${idToRemove}`)
+          .expect(204)
+          .then((res) =>
+            supertest(app).get(`/api/notes`).expect(expectedNotes)
+          );
+      });
+    });
+  });
+  describe(`PATCH /api/notes/:article_id`, () => {
+    context(`Given no notes`, () => {
+      it(`responds with 404`, () => {
+        const noteId = 123456;
+        return supertest(app)
+          .delete(`/api/notes/${noteId}`)
+          .expect(404, { error: { message: `Note doesn't exist` } });
+      });
+    });
+
+    context("Given there are notes in the database", () => {
+      const testFolders = makeFoldersArray();
+      const testNotes = makeNotesArray();
+
+      beforeEach("insert notes", () => {
+        return db
+          .into("noteful_folders")
+          .insert(testFolders)
+          .then(() => {
+            return db.into("noteful_notes").insert(testNotes);
+          });
+      });
+
+      it("responds with 204 and updates the note", () => {
+        const idToUpdate = 2;
+        const updateNote = {
+          name: "updated note name",
+          folderid: 1,
+          content: "updated article content",
+        };
+        const expectedNote = {
+          ...testNotes[idToUpdate - 1],
+          ...updateNote,
+        };
+        return supertest(app)
+          .patch(`/api/notes/${idToUpdate}`)
+          .send(updateNote)
+          .expect(204)
+          .then((res) =>
+            supertest(app).get(`/api/notes/${idToUpdate}`).expect(expectedNote)
+          );
+      });
+
+      it(`responds with 400 when no required fields supplied`, () => {
+        const idToUpdate = 2;
+        return supertest(app)
+          .patch(`/api/notes/${idToUpdate}`)
+          .send({ irrelevantField: "foo" })
+          .expect(400, {
+            error: {
+              message: `Request body must contain either 'name', 'folderid' or 'content'`,
+            },
+          });
+      });
+
+      it(`responds with 204 when updating only a subset of fields`, () => {
+        const idToUpdate = 2;
+        const updateNote = {
+          name: "updated note name",
+        };
+        const expectedNote = {
+          ...testNotes[idToUpdate - 1],
+          ...updateNote,
+        };
+
+        return supertest(app)
+          .patch(`/api/notes/${idToUpdate}`)
+          .send({
+            ...updateNote,
+            fieldToIgnore: "should not be in GET response",
+          })
+          .expect(204)
+          .then((res) =>
+            supertest(app).get(`/api/notes/${idToUpdate}`).expect(expectedNote)
+          );
+      });
     });
   });
 });
