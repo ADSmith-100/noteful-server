@@ -125,4 +125,37 @@ describe("Articles Endpoints", function () {
       });
     });
   });
+  describe(`POST /api/notes`, () => {
+    const testFolders = makeFoldersArray();
+    beforeEach("insert malicious note", () => {
+      return db.into("noteful_folders").insert(testFolders);
+    });
+
+    it(`creates a note, responding with 201 and the new note`, () => {
+      const newNote = {
+        name: "First test note!",
+        folderid: 1,
+        content: "Lorem ipsum",
+      };
+      return supertest(app)
+        .post("/api/notes")
+        .send(newNote)
+        .expect(201)
+        .expect((res) => {
+          expect(res.body.name).to.eql(newNote.name);
+          expect(res.body.folderid).to.eql(newNote.folderid);
+          expect(res.body.content).to.eql(newNote.content);
+          expect(res.body).to.have.property("id");
+          expect(res.headers.location).to.eql(`/api/notes/${res.body.id}`);
+          const expected = new Intl.DateTimeFormat("en-US").format(new Date());
+          const actual = new Intl.DateTimeFormat("en-US").format(
+            new Date(res.body.modified)
+          );
+          expect(actual).to.eql(expected);
+        })
+        .then((res) =>
+          supertest(app).get(`/api/notes/${res.body.id}`).expect(res.body)
+        );
+    });
+  });
 });
