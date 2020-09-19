@@ -23,6 +23,7 @@
     "knex": "^0.21.5",
     "morgan": "^1.10.0",
     "pg": "^8.3.3",
+    "postgrator-cli": "^3.2.0",
     "xss": "^1.0.8"
   },
   "devDependencies": {
